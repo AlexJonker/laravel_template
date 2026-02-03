@@ -11,6 +11,7 @@ Replace all instances of "laravel_template" with the project name.
 ```bash
 composer i
 npm i
+php artisan key:generate
 php artisan migrate
 ```
 
