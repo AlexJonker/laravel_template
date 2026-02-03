@@ -1,13 +1,13 @@
 services:
   laravel_template:
-    image: ghcr.io/alexjonker/laravel_template:main
+    image: ghcr.io/alexjonker/laravel_template:latest
     container_name: laravel_template
     restart: unless-stopped
     ports:
       - 67:80
     volumes:
-      - /DATA/AppData/laravel_template/app:/laravel_template-data
-      - /DATA/AppData/laravel_template/logs:/var/www/html/storage/logs
+      - laravel_template-data:/laravel_template-data
+      - laravel_template-logs:/var/www/html/storage/logs
     environment:
       - APP_NAME=laravel_template
       - APP_URL=http://localhost:67
@@ -39,11 +39,15 @@ services:
       - MYSQL_PASSWORD=ifcLwRI0SrBaDMs9lPTsCHQqF4NmMnHaXGWsYtQuu8wvSZWMfw99CoKqPjGkH9KIx1v
       - MYSQL_ROOT_PASSWORD=do_not_change_this_without_also_changing_healthcheck_VlECtVfW07GqKtwh6qE42fSPBb43NRcrNyCuB5N3QNJHSRzsvuAIgn9uohWBnUgdZDX
     volumes:
-      - /DATA/AppData/laravel_template/db:/var/lib/mysql
+      - laravel_template-db:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mariadb-admin" ,"ping", "-h", "localhost", "--password=do_not_change_this_without_also_changing_healthcheck_VlECtVfW07GqKtwh6qE42fSPBb43NRcrNyCuB5N3QNJHSRzsvuAIgn9uohWBnUgdZDX"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-networks: {}
+
+volumes:
+  laravel_template-data:
+  laravel_template-logs:
+  laravel_template-db:

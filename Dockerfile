@@ -76,6 +76,7 @@ RUN chown root:www-data ./ \
     && find ./ -type d -exec chmod 750 {} \; \
     # Create necessary directories
     && mkdir -p /laravel_template-data/storage /var/www/html/storage/app/public /var/run/supervisord /etc/supercronic \
+    && mkdir -p /var/lib/nginx/tmp/client_body /var/lib/nginx/logs /var/log/nginx /run/nginx \
     # Symlinks for env, database, and avatars
     && ln -s /laravel_template-data/.env ./.env \
     && ln -s /laravel_template-data/database/database.sqlite ./database/database.sqlite \
@@ -83,8 +84,8 @@ RUN chown root:www-data ./ \
     && ln -s  /laravel_template-data/storage/avatars /var/www/html/storage/app/public/avatars \
     && ln -s  /laravel_template-data/storage/fonts /var/www/html/storage/app/public/fonts \
     # Allow www-data write permissions where necessary
-    && chown -R www-data:www-data /laravel_template-data ./storage ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
-    && chmod -R u+rwX,g+rwX,o-rwx /laravel_template-data ./storage ./bootstrap/cache /var/run/supervisord \
+    && chown -R www-data:www-data /laravel_template-data ./storage ./bootstrap/cache /var/run/supervisord /var/lib/nginx /var/log/nginx /run/nginx /var/www/html/public/storage \
+    && chmod -R u+rwX,g+rwX,o-rwx /laravel_template-data ./storage ./bootstrap/cache /var/run/supervisord /var/lib/nginx /var/log/nginx /run/nginx \
     && chown -R www-data: /usr/local/etc/php/
 
 # Configure Supervisor

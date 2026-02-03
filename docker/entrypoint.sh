@@ -8,7 +8,7 @@ else
   touch /laravel_template-data/.env
 
   ## manually generate a key because key generate --force fails
-  if [ -z $APP_KEY ]; then
+  if [ -z "${APP_KEY:-}" ]; then
     echo -e "Generating key."
     APP_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     echo -e "Generated app key: $APP_KEY"
@@ -38,7 +38,7 @@ export PARSED_LE_EMAIL="email ${LE_EMAIL}"
 export PARSED_APP_URL=${APP_URL}
 
 # when running behind a proxy
-if [[ ${BEHIND_PROXY} == "true" ]]; then
+if [ "${BEHIND_PROXY:-}" = "true" ]; then
   echo "running behind proxy"
   echo "listening on port 80 internally"
   export PARSED_LE_EMAIL=""
@@ -48,7 +48,7 @@ if [[ ${BEHIND_PROXY} == "true" ]]; then
 fi
 
 ## disable nginx if SKIP_NGINX is set
-if [[ "${SKIP_NGINX:-}" == "true" ]]; then
+if [ "${SKIP_NGINX:-}" = "true" ]; then
   echo "Starting PHP-FPM only"
 else
   echo "Starting PHP-FPM and Nginx"
@@ -56,7 +56,7 @@ else
   export SUPERVISORD_NGINX=true
 
   # handle trusted proxies for nginx (configuration already in nginx.conf)
-  if [[ ! -z ${TRUSTED_PROXIES} ]]; then
+  if [ -n "${TRUSTED_PROXIES:-}" ]; then
     # Note: Nginx trusted proxies are configured in nginx.conf
     echo "Trusted proxies: ${TRUSTED_PROXIES}"
   fi
