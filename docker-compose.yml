@@ -1,7 +1,6 @@
 services:
   laravel_template:
-    image: ghcr.io/alexjonker/laravel_template:latest
-    container_name: laravel_template
+    image: laravel_template
     restart: unless-stopped
     ports:
       - 67:80
@@ -31,7 +30,6 @@ services:
       start_period: 30s
   db:
     image: mariadb:latest
-    container_name: laravel_template-db
     restart: unless-stopped
     environment:
       - MYSQL_DATABASE=laravel_template

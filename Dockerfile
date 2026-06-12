@@ -1,108 +1,101 @@
-# syntax=docker.io/docker/dockerfile:1.13-labs
-# laravel_template Production Dockerfile
+# ================================
+# Stage: PHP Base
+# ================================
+FROM --platform=$TARGETOS/$TARGETARCH php:8.5-fpm-alpine AS base-php
 
-##
-#  If you want to build this locally you want to run `docker build -f Dockerfile`
-##
+ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+RUN install-php-extensions bcmath gd intl zip opcache pcntl posix pdo_mysql pdo_pgsql \
+    && rm /usr/local/bin/install-php-extensions
 
 # ================================
-# Stage 1-1: Composer Install
+# Stage: Composer
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS composer
+FROM --platform=$TARGETOS/$TARGETARCH base-php AS composer
 
 WORKDIR /build
 
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
-
-# Copy bare minimum to install Composer dependencies
 COPY composer.json composer.lock ./
 
 RUN composer install --no-dev --no-interaction --no-autoloader --no-scripts
 
-# ================================
-# Stage 1-2: NPM Install
-# ================================
-FROM --platform=$TARGETOS/$TARGETARCH node:20-alpine AS npm
-
-WORKDIR /build
-
-# Copy bare minimum to install NPM dependencies
-COPY package.json package-lock.json ./
-
-RUN npm ci
-
-# ================================
-# Stage 2-1: Composer Optimize
-# ================================
-FROM --platform=$TARGETOS/$TARGETARCH composer AS composerbuild
-
-# Copy full code to optimize autoload
 COPY --exclude=nginx.conf --exclude=docker/ . ./
-
 RUN composer dump-autoload --optimize --no-scripts
 
 # ================================
-# Stage 2-2: Build Frontend Assets
+# Stage: NPM / Frontend
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH npm AS npmbuild
+FROM --platform=$TARGETOS/$TARGETARCH node:alpine AS npm
 
 WORKDIR /build
 
-# Copy full code
+COPY package.json package-lock.json ./
+RUN npm ci
+
 COPY --exclude=nginx.conf --exclude=docker/ . ./
-COPY --from=composer /build .
+COPY --from=composer /build/vendor ./vendor
 
 RUN npm run build
 
 # ================================
-# Stage 5: Build Final Application Image
+# Stage: Final
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS final
+FROM --platform=$TARGETOS/$TARGETARCH base-php AS final
 
 WORKDIR /var/www/html
 
-# Install additional required libraries
-RUN apk add --no-cache \
-    nginx ca-certificates supervisor supercronic fcgi
+RUN apk add --no-cache nginx ca-certificates supervisor supercronic fcgi
 
-COPY --chown=root:www-data --chmod=640 --from=composerbuild /build .
-COPY --chown=root:www-data --chmod=640 --from=npmbuild /build/public ./public
+COPY --chown=root:www-data --chmod=640 --from=composer /build .
+COPY --chown=root:www-data --chmod=640 --from=npm /build/public ./public
 
-# Set permissions
-# First ensure all files are owned by root and restrict www-data to read access
 RUN chown root:www-data ./ \
     && chmod 750 ./ \
-    # Files should not have execute set, but directories need it
     && find ./ -type d -exec chmod 750 {} \; \
-    # Create necessary directories
-    && mkdir -p /laravel_template-data/storage /var/www/html/storage/app/public /var/run/supervisord /etc/supercronic \
-    && mkdir -p /var/lib/nginx/tmp/client_body /var/lib/nginx/logs /var/log/nginx /run/nginx \
-    # Symlinks for env, database, and avatars
+    && mkdir -p \
+        /laravel_template-data/storage \
+        /var/www/html/storage/app/public \
+        /var/run/supervisord \
+        /etc/supercronic \
+        /var/lib/nginx/tmp/client_body \
+        /var/lib/nginx/logs \
+        /var/log/nginx \
+        /run/nginx \
     && ln -s /laravel_template-data/.env ./.env \
     && ln -s /laravel_template-data/database/database.sqlite ./database/database.sqlite \
     && ln -sf /var/www/html/storage/app/public /var/www/html/public/storage \
-    && ln -s  /laravel_template-data/storage/avatars /var/www/html/storage/app/public/avatars \
-    && ln -s  /laravel_template-data/storage/fonts /var/www/html/storage/app/public/fonts \
-    # Allow www-data write permissions where necessary
-    && chown -R www-data:www-data /laravel_template-data ./storage ./bootstrap/cache /var/run/supervisord /var/lib/nginx /var/log/nginx /run/nginx /var/www/html/public/storage \
-    && chmod -R u+rwX,g+rwX,o-rwx /laravel_template-data ./storage ./bootstrap/cache /var/run/supervisord /var/lib/nginx /var/log/nginx /run/nginx \
+    && ln -s /laravel_template-data/storage/avatars /var/www/html/storage/app/public/avatars \
+    && ln -s /laravel_template-data/storage/fonts /var/www/html/storage/app/public/fonts \
+    && chown -R www-data:www-data \
+        /laravel_template-data \
+        ./storage \
+        ./bootstrap/cache \
+        /var/run/supervisord \
+        /var/lib/nginx \
+        /var/log/nginx \
+        /run/nginx \
+        /var/www/html/public/storage \
+    && chmod -R u+rwX,g+rwX,o-rwx \
+        /laravel_template-data \
+        ./storage \
+        ./bootstrap/cache \
+        /var/run/supervisord \
+        /var/lib/nginx \
+        /var/log/nginx \
+        /run/nginx \
     && chown -R www-data: /usr/local/etc/php/
 
-# Configure Supervisor
 COPY docker/supervisord.conf /etc/supervisord.conf
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
-
 COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/healthcheck.sh /healthcheck.sh
 
 HEALTHCHECK --interval=5m --timeout=10s --start-period=5s --retries=3 \
-  CMD /bin/ash /healthcheck.sh
+    CMD /bin/ash /healthcheck.sh
 
 EXPOSE 80 443
-
 VOLUME /laravel_template-data
-
 USER www-data
 
-ENTRYPOINT [ "/bin/ash", "/entrypoint.sh" ]
-CMD [ "supervisord", "-n", "-c", "/etc/supervisord.conf" ]
+ENTRYPOINT ["/bin/ash", "/entrypoint.sh"]
+CMD ["supervisord", "-n", "-c", "/etc/supervisord.conf"]
